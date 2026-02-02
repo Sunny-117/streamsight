@@ -1,0 +1,28 @@
+{
+  "name": "@streamsight/backend-api",
+  "version": "0.1.0",
+  "description": "StreamSight 后端 API 服务",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsx watch src/index.ts",
+    "start": "node dist/index.js",
+    "clean": "rm -rf dist",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "fastify": "^4.24.3",
+    "@fastify/cors": "^8.4.0",
+    "@fastify/multipart": "^8.0.0",
+    "uuid": "^9.0.1",
+    "mysql2": "^3.6.5",
+    "dotenv": "^16.3.1",
+  "streamsight-core-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.7",
+    "@types/node": "^20.8.0",
+    "tsx": "^4.6.2",
+    "typescript": "^5.2.2"
+  }
+}

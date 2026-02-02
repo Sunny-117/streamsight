@@ -1,23 +1,35 @@
 {
-  "name": "react-challenges",
+  "name": "streamsight-monorepo",
+  "version": "0.1.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
+  "description": "StreamSight 用户行为录制与回放系统",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview"
-  },
-  "dependencies": {
-    "axios": "^1.2.0",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "clean": "turbo run clean",
+    "type-check": "turbo run type-check",
+    "publish-packages": "turbo run build --filter='./packages/*' && changeset publish",
+    "demo": "pnpm --filter @streamsight/demo-app dev",
+    "backend": "pnpm --filter @streamsight/backend-api dev",
+    "replay": "pnpm --filter @streamsight/replay-platform dev",
+    "e2e": "concurrently \"pnpm backend\" \"pnpm demo\" \"pnpm replay\""
   },
   "devDependencies": {
-    "@types/react": "^18.0.24",
-    "@types/react-dom": "^18.0.8",
-    "@vitejs/plugin-react": "^2.2.0",
-    "typescript": "^4.6.4",
-    "vite": "^3.2.3"
+    "@changesets/cli": "^2.26.2",
+    "@typescript-eslint/eslint-plugin": "^6.7.4",
+    "@typescript-eslint/parser": "^6.7.4",
+    "concurrently": "^8.2.2",
+    "eslint": "^8.50.0",
+    "eslint-config-prettier": "^9.0.0",
+    "prettier": "^3.0.3",
+    "turbo": "^1.10.14",
+    "typescript": "^5.2.2"
+  },
+  "packageManager": "pnpm@8.7.6",
+  "engines": {
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
   }
 }

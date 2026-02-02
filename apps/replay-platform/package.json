@@ -1,0 +1,26 @@
+{
+  "name": "@streamsight/replay-platform",
+  "version": "0.1.0",
+  "description": "StreamSight 回放查看器",
+  "scripts": {
+    "dev": "next dev -p 3000",
+    "build": "next build",
+    "start": "next start -p 3000",
+    "clean": "rm -rf .next",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "^14.0.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "rrweb": "^2.0.0-alpha.11",
+    "rrweb-player": "^2.0.0-alpha.11",
+    "streamsight-core-utils": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^20.8.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "typescript": "^5.2.2"
+  }
+}
