@@ -49,10 +49,11 @@ export class WorkerBridge {
       options: { type, level },
     }
 
-    return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve: resolve as any, reject })
-      this.worker!.postMessage(message)
-    })
+    const result = await this.sendRequest(message)
+    if (typeof result === 'string') {
+      throw new Error('Worker 返回了无效的压缩结果')
+    }
+    return result
   }
 
   async decompress(
@@ -71,10 +72,11 @@ export class WorkerBridge {
       options: { type },
     }
 
-    return new Promise((resolve, reject) => {
-      this.pendingRequests.set(id, { resolve: resolve as any, reject })
-      this.worker!.postMessage(message, [data])
-    })
+    const result = await this.sendRequest(message, [data])
+    if (result instanceof ArrayBuffer) {
+      throw new Error('Worker 返回了无效的解压结果')
+    }
+    return result
   }
 
   destroy(): void {
@@ -115,6 +117,13 @@ export class WorkerBridge {
 
   private generateId(): string {
     return `req_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
+  }
+
+  private sendRequest(message: WorkerMessage, transferables: Transferable[] = []): Promise<ArrayBuffer | string> {
+    return new Promise((resolve, reject) => {
+      this.pendingRequests.set(message.id, { resolve, reject })
+      this.worker!.postMessage(message, transferables)
+    })
   }
 
   private getWorkerCode(): string {

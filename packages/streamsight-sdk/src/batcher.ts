@@ -9,7 +9,7 @@ export interface BatcherConfig {
 export class EventBatcher {
   private events: eventWithTime[] = []
   private batchIndex = 0
-  private timer: NodeJS.Timeout | null = null
+  private timer: ReturnType<typeof setTimeout> | null = null
   private config: BatcherConfig
 
   constructor(config: BatcherConfig) {

@@ -74,15 +74,15 @@ pnpm e2e
 - 后端 API 服务（支持本地文件和 MySQL 存储）
 - 简单测试页面验证
 
-⚠️ **已知问题**：
-- rrweb 类型定义冲突，暂时禁用了 DOM 增强插件
-- 部分 TypeScript 类型需要进一步优化
-- 回放平台需要完善 rrweb-player 集成
+✅ **已修复问题**：
+- rrweb 类型定义冲突已修复，已启用内置 DOM 增强插件（支持 URL 脱敏处理）
+- TypeScript 类型已收敛，修复了 `ArrayBufferLike`、浏览器定时器和跨包类型污染问题
+- 回放平台已完成 rrweb-player 类型化集成，包含播放器初始化与销毁边界处理
 
-🔧 **快速修复建议**：
-1. 使用 `test-simple.html` 验证基础录制功能
-2. 后续可以逐步完善 rrweb 集成
-3. 优化 TypeScript 类型定义
+🔧 **验证建议**：
+1. 使用 `test-simple.html` 验证基础录制与上传
+2. 运行 `pnpm --filter streamsight type-check` 验证 SDK 类型
+3. 运行 `pnpm --filter @streamsight/replay-platform type-check` 验证回放平台类型
 
 ## 📦 项目结构
 
@@ -198,7 +198,7 @@ stop(): void
 flush(): Promise<void>
 
 // 设置用户信息
-setUser(userId: string, meta?: Record<string, any>): void
+setUser(userId: string, meta?: Record<string, unknown>): void
 
 // 添加遮盖选择器
 addMaskSelector(selector: string): void

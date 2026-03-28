@@ -1,41 +1,13 @@
-import { record } from 'rrweb'
-
-// 定义必要的类型
-export interface eventWithTime {
-  type: number
-  data: any
-  timestamp: number
-}
-
-interface recordOptions {
-  emit: (event: eventWithTime) => void
-  checkoutEveryNms?: number
-  maskTextSelector?: string
-  blockSelector?: string
-  maskAllInputs?: boolean
-  maskInputOptions?: {
-    password?: boolean
-  }
-  recordCanvas?: boolean
-  collectFonts?: boolean
-  inlineStylesheet?: boolean
-  slimDOMOptions?: {
-    script?: boolean
-    comment?: boolean
-    headFavicon?: boolean
-    headWhitespace?: boolean
-    headMetaDescKeywords?: boolean
-    headMetaSocial?: boolean
-    headMetaRobots?: boolean
-    headMetaHttpEquiv?: boolean
-    headMetaAuthorship?: boolean
-    headMetaVerification?: boolean
-  }
-}
+import { EventType, record } from 'rrweb'
+import type { eventWithTime as RRWebEventWithTime, recordOptions as RRWebRecordOptions } from 'rrweb'
 import { EventBatcher } from './batcher'
 import { PrivacyManager } from './privacy'
 import { Uploader } from './uploader'
-import { WorkerBridge } from 'streamsight-core-utils'
+import { WorkerBridge, sanitizeUrl } from 'streamsight-core-utils'
+
+export type eventWithTime = RRWebEventWithTime
+
+type RRWebPlugin = NonNullable<RRWebRecordOptions<RRWebEventWithTime>['plugins']>[number]
 
 export interface StreamsightConfig {
   /** 应用标识 */
@@ -75,6 +47,15 @@ export interface StreamsightConfig {
     /** 重试延迟（毫秒），默认 1000 */
     retryDelay?: number
   }
+  /** rrweb 录制配置 */
+  recording?: {
+    /** 全量快照间隔（毫秒），默认 10 分钟 */
+    checkoutEveryNms?: number
+    /** 是否启用内置 DOM 增强插件，默认 true */
+    enableDomEnhancementPlugin?: boolean
+    /** 额外 rrweb 插件 */
+    plugins?: RRWebRecordOptions<RRWebEventWithTime>['plugins']
+  }
 }
 
 export interface StreamsightBatch {
@@ -104,6 +85,11 @@ export class StreamsightRecorder {
     network: {
       retryCount: number
       retryDelay: number
+    }
+    recording: {
+      checkoutEveryNms: number
+      enableDomEnhancementPlugin: boolean
+      plugins: RRWebRecordOptions<RRWebEventWithTime>['plugins']
     }
   }
   private isRecording = false
@@ -138,6 +124,12 @@ export class StreamsightRecorder {
         retryDelay: 1000,
         ...config.network,
       },
+      recording: {
+        checkoutEveryNms: 10 * 60 * 1000,
+        enableDomEnhancementPlugin: true,
+        plugins: [],
+        ...config.recording,
+      },
     }
 
     this.sessionId = this.config.sessionId
@@ -166,10 +158,17 @@ export class StreamsightRecorder {
         console.error('StreamSight: Worker 初始化失败', err)
       })
 
+      const plugins: RRWebRecordOptions<RRWebEventWithTime>['plugins'] = [
+        ...(this.config.recording.plugins || []),
+      ]
+      if (this.config.recording.enableDomEnhancementPlugin) {
+        plugins.push(this.createDomEnhancementPlugin())
+      }
+
       // 配置 rrweb 录制选项
-      const recordOptions: recordOptions = {
+      const recordOptions: RRWebRecordOptions<RRWebEventWithTime> = {
         emit: this.handleEvent.bind(this),
-        checkoutEveryNms: 10 * 60 * 1000, // 每 10 分钟生成一次全量快照
+        checkoutEveryNms: this.config.recording.checkoutEveryNms,
         
         // 脱敏配置
         maskTextSelector: this.privacyManager.getMaskSelectors().join(','),
@@ -181,13 +180,11 @@ export class StreamsightRecorder {
           password: this.config.privacy.maskPasswords,
         },
 
-        // DOM 增强处理
-        // 注意：由于 rrweb 类型定义复杂，暂时不使用插件系统
-
         // 采集配置
         recordCanvas: false, // MVP 暂不支持 Canvas
         collectFonts: true,
         inlineStylesheet: true,
+        plugins: plugins.length > 0 ? plugins : undefined,
         
         // 脚本安全处理
         slimDOMOptions: {
@@ -206,7 +203,7 @@ export class StreamsightRecorder {
 
       // 使用 requestIdleCallback 或 setTimeout 延迟初始化，避免阻塞主线程
       const startRecording = () => {
-        this.stopRecording = record(recordOptions)
+        this.stopRecording = record<RRWebEventWithTime>(recordOptions)
         this.isRecording = true
 
         console.log('StreamSight: 录制已开始', {
@@ -255,7 +252,7 @@ export class StreamsightRecorder {
   /**
    * 设置用户信息
    */
-  setUser(userId: string, meta?: Record<string, any>): void {
+  setUser(userId: string, meta?: Record<string, unknown>): void {
     this.config.userId = userId
     // 可以在这里添加用户元数据事件
     console.log('StreamSight: 用户信息已更新', { userId, meta })
@@ -341,6 +338,26 @@ export class StreamsightRecorder {
     return `ss_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`
   }
 
+  private createDomEnhancementPlugin(): RRWebPlugin {
+    return {
+      name: 'streamsight-dom-enhancement',
+      options: {},
+      eventProcessor: event => {
+        if (
+          event.type === EventType.Meta &&
+          typeof event.data === 'object' &&
+          event.data !== null &&
+          'href' in event.data &&
+          typeof event.data.href === 'string'
+        ) {
+          event.data.href = sanitizeUrl(event.data.href)
+        }
+
+        return event
+      },
+    }
+  }
+
 
 }
 
@@ -393,7 +410,7 @@ export async function flush(): Promise<void> {
 /**
  * 设置用户信息（使用全局实例）
  */
-export function setUser(userId: string, meta?: Record<string, any>): void {
+export function setUser(userId: string, meta?: Record<string, unknown>): void {
   if (!globalRecorder) {
     throw new Error('StreamSight: 请先调用 init() 初始化 SDK')
   }

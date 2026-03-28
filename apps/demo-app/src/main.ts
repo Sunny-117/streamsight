@@ -1,7 +1,7 @@
 import { init, start, stop, flush, setUser } from 'streamsight'
 
 // 初始化 SDK
-const recorder = init({
+init({
   appId: 'demo-app',
   apiEndpoint: 'http://localhost:3001',
   userId: 'demo-user-' + Math.random().toString(36).substr(2, 9),

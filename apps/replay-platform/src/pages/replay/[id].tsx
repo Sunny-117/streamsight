@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/router'
+import type { eventWithTime } from 'rrweb'
 import 'rrweb-player/dist/style.css'
 
-interface eventWithTime {
-  type: number
-  data: any
-  timestamp: number
-}
+type RRWebPlayerConstructor = (typeof import('rrweb-player'))['default']
+type RRWebPlayerInstance = InstanceType<RRWebPlayerConstructor>
+type DestroyablePlayer = RRWebPlayerInstance & { $destroy?: () => void }
 
 interface ReplayMetadata {
   replayId: string
@@ -33,7 +32,7 @@ export default function ReplayPage() {
   const router = useRouter()
   const { id, session } = router.query
   const playerRef = useRef<HTMLDivElement>(null)
-  const playerInstanceRef = useRef<any>(null)
+  const playerInstanceRef = useRef<RRWebPlayerInstance | null>(null)
   
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -46,13 +45,7 @@ export default function ReplayPage() {
     }
     
     return () => {
-      if (playerInstanceRef.current) {
-        try {
-          playerInstanceRef.current.$destroy()
-        } catch (e) {
-          console.warn('清理播放器失败:', e)
-        }
-      }
+      destroyPlayer()
     }
   }, [id, session])
 
@@ -133,19 +126,12 @@ export default function ReplayPage() {
     if (!playerRef.current) return
 
     try {
-      const rrwebPlayer = await import('rrweb-player')
-      
-      if (playerInstanceRef.current) {
-        try {
-          playerInstanceRef.current.$destroy()
-        } catch (e) {
-          console.warn('清理旧播放器失败:', e)
-        }
-      }
+      const { default: RRWebPlayer } = await import('rrweb-player')
+      destroyPlayer()
       
       playerRef.current.innerHTML = ''
 
-      playerInstanceRef.current = new rrwebPlayer.default({
+      playerInstanceRef.current = new RRWebPlayer({
         target: playerRef.current,
         props: {
           events: replayEvents,
@@ -167,6 +153,23 @@ export default function ReplayPage() {
     } catch (error) {
       console.error('初始化播放器失败:', error)
       setError('播放器初始化失败: ' + (error instanceof Error ? error.message : '未知错误'))
+    }
+  }
+
+  const destroyPlayer = () => {
+    if (!playerInstanceRef.current) {
+      return
+    }
+
+    try {
+      const instance = playerInstanceRef.current as DestroyablePlayer
+      if (typeof instance.$destroy === 'function') {
+        instance.$destroy()
+      }
+    } catch (e) {
+      console.warn('清理播放器失败:', e)
+    } finally {
+      playerInstanceRef.current = null
     }
   }
 

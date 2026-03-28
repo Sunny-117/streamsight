@@ -37,7 +37,7 @@ export async function replayRoutes(fastify: FastifyInstance) {
     bodyLimit: 10485760, // 10MB
     handler: async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const headers = request.headers as any
+      const headers = request.headers as Partial<ReplayHeaders>
       const {
         'x-app-id': appId,
         'x-session-id': sessionId,
@@ -160,8 +160,12 @@ export async function replayRoutes(fastify: FastifyInstance) {
       // 如果请求解压
       if (query.decompress === 'true') {
         try {
+          const arrayBuffer = data.buffer.slice(
+            data.byteOffset,
+            data.byteOffset + data.byteLength
+          ) as ArrayBuffer
           const decompressed = await CompressionAdapter.decompress(
-            data.buffer as ArrayBuffer,
+            arrayBuffer,
             metadata.compression as 'gzip' | 'zstd'
           )
           

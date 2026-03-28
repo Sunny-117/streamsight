@@ -1,17 +1,31 @@
 import type { CompressionType } from './types'
 
-// 动态导入 fflate 以避免构建时错误
-let fflate: any = null
+type FflateModule = typeof import('fflate')
 
-async function loadFflate() {
+// 动态导入 fflate 以避免构建时错误
+let fflate: FflateModule | null = null
+
+async function loadFflate(): Promise<FflateModule | null> {
   if (!fflate) {
     try {
       fflate = await import('fflate')
-    } catch (error) {
+    } catch {
       console.warn('fflate 加载失败，使用浏览器原生压缩')
     }
   }
   return fflate
+}
+
+function toArrayBuffer(data: Uint8Array): ArrayBuffer {
+  const { buffer, byteOffset, byteLength } = data
+  return buffer.slice(byteOffset, byteOffset + byteLength) as ArrayBuffer
+}
+
+type GzipLevel = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9
+
+function normalizeLevel(level: number): GzipLevel {
+  const safeLevel = Math.min(9, Math.max(0, Math.round(level)))
+  return safeLevel as GzipLevel
 }
 
 export class CompressionAdapter {
@@ -64,11 +78,11 @@ export class CompressionAdapter {
     
     if (fflateLib && fflateLib.gzip) {
       return new Promise((resolve, reject) => {
-        fflateLib.gzip(data, { level }, (err: any, compressed: Uint8Array) => {
+        fflateLib.gzip(data, { level: normalizeLevel(level) }, (err, compressed) => {
           if (err) {
             reject(err)
           } else {
-            resolve(compressed.buffer)
+            resolve(toArrayBuffer(compressed))
           }
         })
       })
@@ -78,8 +92,9 @@ export class CompressionAdapter {
         const stream = new CompressionStream('gzip')
         const writer = stream.writable.getWriter()
         const reader = stream.readable.getReader()
+        const inputBuffer = toArrayBuffer(data)
         
-        writer.write(data)
+        writer.write(inputBuffer)
         writer.close()
         
         const chunks: Uint8Array[] = []
@@ -102,11 +117,11 @@ export class CompressionAdapter {
           offset += chunk.length
         }
         
-        return result.buffer
+        return toArrayBuffer(result)
       } else {
         // 最后回退：不压缩
         console.warn('压缩不可用，返回原始数据')
-        return data.buffer
+        return toArrayBuffer(data)
       }
     }
   }
@@ -116,7 +131,7 @@ export class CompressionAdapter {
     
     if (fflateLib && fflateLib.gunzip) {
       return new Promise((resolve, reject) => {
-        fflateLib.gunzip(data, (err: any, decompressed: Uint8Array) => {
+        fflateLib.gunzip(data, (err, decompressed) => {
           if (err) {
             reject(err)
           } else {
@@ -131,8 +146,9 @@ export class CompressionAdapter {
         const stream = new DecompressionStream('gzip')
         const writer = stream.writable.getWriter()
         const reader = stream.readable.getReader()
+        const inputBuffer = toArrayBuffer(data)
         
-        writer.write(data)
+        writer.write(inputBuffer)
         writer.close()
         
         const chunks: Uint8Array[] = []
@@ -161,7 +177,7 @@ export class CompressionAdapter {
         // 最后回退：假设数据未压缩
         console.warn('解压不可用，假设数据未压缩')
         const decoder = new TextDecoder()
-        return decoder.decode(data)
+        return decoder.decode(new Uint8Array(toArrayBuffer(data)))
       }
     }
   }
