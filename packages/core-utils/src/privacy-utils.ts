@@ -12,13 +12,13 @@ export const DEFAULT_SENSITIVE_PATTERNS = [
 ]
 
 export const DEFAULT_MASK_SELECTORS = [
-  '.oo-mask',
+  '.ss-mask',
   '[data-sensitive]',
   '.sensitive',
 ]
 
 export const DEFAULT_BLOCK_SELECTORS = [
-  '.oo-block',
+  '.ss-block',
   '[data-private]',
   '.private',
   'script',

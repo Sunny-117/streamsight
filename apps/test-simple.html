@@ -45,7 +45,7 @@
       border-radius: 3px;
     }
     
-    .oo-mask {
+    .ss-mask {
       background: #ffebee;
       padding: 2px 4px;
       border-radius: 3px;
@@ -80,12 +80,12 @@
     <h3>测试区域</h3>
     <input type="text" placeholder="普通输入框">
     <input type="password" placeholder="密码输入框（会被脱敏）">
-    <input type="text" class="oo-mask" placeholder="脱敏输入框">
+    <input type="text" class="ss-mask" placeholder="脱敏输入框">
     <textarea placeholder="文本区域"></textarea>
     
     <div style="margin: 10px 0;">
       <button onclick="alert('点击测试')">点击我</button>
-      <span class="oo-mask">这是脱敏文本</span>
+      <span class="ss-mask">这是脱敏文本</span>
     </div>
   </div>
 
@@ -145,7 +145,7 @@
         }
         
         this.inputHandler = (e) => {
-          const shouldMask = e.target.type === 'password' || e.target.classList.contains('oo-mask')
+          const shouldMask = e.target.type === 'password' || e.target.classList.contains('ss-mask')
           this.addEvent({
             type: 'input',
             target: e.target.tagName,

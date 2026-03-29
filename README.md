@@ -51,14 +51,14 @@ pnpm e2e
 ### E2E 验证流程
 
 #### 方式一：使用完整演示应用
-1. 打开演示应用：http://localhost:5174
+1. 打开演示应用：http://localhost:5173
 2. 在页面上进行各种操作（点击、输入、滚动等）
 3. 点击"停止录制"按钮
 4. 打开回放平台：http://localhost:3000
 5. 查看录制的会话并播放
 
 #### 方式二：使用简单测试页面（推荐用于快速验证）
-1. 在浏览器中打开 `test-simple.html`
+1. 在浏览器中打开 `apps/test-simple.html`
 2. 点击"开始录制"
 3. 进行各种操作（输入、点击等）
 4. 查看浏览器控制台的日志输出
@@ -68,19 +68,15 @@ pnpm e2e
 
 ✅ **已完成功能**：
 - Monorepo 项目结构搭建
-- 核心 SDK 基础框架
-- 事件批次处理逻辑
-- Web Worker 压缩桥接
+- 核心 SDK（rrweb 录制、批次处理、网络重试与离线队列）
+- ZSTD / GZIP 压缩链路（含 Web Worker 与 `@bokuweb/zstd-wasm`）
 - 后端 API 服务（支持本地文件和 MySQL 存储）
-- 简单测试页面验证
-
-✅ **已修复问题**：
-- rrweb 类型定义冲突已修复，已启用内置 DOM 增强插件（支持 URL 脱敏处理）
-- TypeScript 类型已收敛，修复了 `ArrayBufferLike`、浏览器定时器和跨包类型污染问题
-- 回放平台已完成 rrweb-player 类型化集成，包含播放器初始化与销毁边界处理
-
+- Demo 应用内置会话列表与回放播放器（`apps/demo-app/src/replay-viewer.ts`）
+- Replay Platform 支持批次回放与整会话聚合回放
+- GitHub Pages 部署脚本与 Service Worker 本地 IndexedDB 模式
+- 简单测试页面验证（`apps/test-simple.html`）
 🔧 **验证建议**：
-1. 使用 `test-simple.html` 验证基础录制与上传
+1. 使用 `apps/test-simple.html` 验证基础录制与上传
 2. 运行 `pnpm --filter streamsight type-check` 验证 SDK 类型
 3. 运行 `pnpm --filter @streamsight/replay-platform type-check` 验证回放平台类型
 
@@ -90,9 +86,10 @@ pnpm e2e
 streamsight/
 ├── apps/
 │   ├── replay-platform/     # Next.js 回放查看器
-│   └── demo-app/            # 演示应用
+│   ├── demo-app/            # 演示应用
+│   └── test-simple.html     # 简单录制验证页
 ├── packages/
-│   ├── streamsight/     # 核心 SDK (streamsight)
+│   ├── streamsight-sdk/     # 核心 SDK (npm 包名: streamsight)
 │   ├── core-utils/          # 共享工具 (streamsight-core-utils)
 │   └── backend-api/         # 后端 API (@streamsight/backend-api)
 ```
@@ -134,15 +131,15 @@ const recorder = init({
   
   // 脱敏配置
   privacy: {
-    maskSelectors: ['.oo-mask', '.sensitive'],
-    blockSelectors: ['.oo-block', '.private'],
+    maskSelectors: ['.ss-mask', '.sensitive'],
+    blockSelectors: ['.ss-block', '.private'],
     maskAllInputs: false,
     maskPasswords: true,
   },
   
   // 压缩配置
   compression: {
-    type: 'gzip',          // 'gzip' | 'zstd'
+    type: 'zstd',          // 'gzip' | 'zstd'，SDK 默认 zstd
     level: 6,
   },
   
@@ -161,10 +158,10 @@ SDK 支持多种脱敏策略：
 1. **CSS 类名脱敏**
    ```html
    <!-- 文本遮盖 -->
-   <span class="oo-mask">敏感信息</span>
+   <span class="ss-mask">敏感信息</span>
    
    <!-- 元素阻止 -->
-   <div class="oo-block">私密内容</div>
+   <div class="ss-block">私密内容</div>
    ```
 
 2. **自动模式识别**
@@ -179,7 +176,7 @@ SDK 支持多种脱敏策略：
    <input type="password" />
    
    <!-- 自定义遮盖 -->
-   <input class="oo-mask" type="text" />
+   <input class="ss-mask" type="text" />
    ```
 
 ### API 参考
@@ -248,50 +245,11 @@ pnpm backend
 - `replay_metadata`: 回放元数据
 - `replay_data`: 回放二进制数据
 
-## 🔄 压缩方案替换
+## 🔄 压缩策略
 
-### 当前方案（MVP）
-
-默认使用 `fflate` 库进行 gzip 压缩：
-
-```typescript
-// packages/core-utils/src/compression.ts
-import { gzip, gunzip } from 'fflate'
-```
-
-### 升级到 ZSTD（推荐）
-
-1. **安装维护中的 ZSTD WASM 库**
-```bash
-pnpm --filter streamsight-core-utils add @bokuweb/zstd-wasm
-```
-
-2. **更新压缩适配器**
-```typescript
-// packages/core-utils/src/compression.ts
-import { init, compress, decompress } from '@bokuweb/zstd-wasm'
-
-// 在 CompressionAdapter 类中添加
-await init()
-
-private static async compressZstd(data: Uint8Array, level: number): Promise<ArrayBuffer> {
-  const compressed = compress(data, level)
-  return compressed.buffer
-}
-
-private static async decompressZstd(data: Uint8Array): Promise<string> {
-  const decompressed = decompress(data)
-  const decoder = new TextDecoder()
-  return decoder.decode(decompressed)
-}
-```
-
-3. **更新支持检测**
-```typescript
-static isZstdSupported(): boolean {
-  return typeof WebAssembly !== 'undefined'
-}
-```
+- SDK 默认使用 `zstd`（`@bokuweb/zstd-wasm`），可在配置中切换到 `gzip`
+- 回放端支持按照元数据中的 `compression` 字段自动选择解压方式
+- GitHub Pages 模式下的 demo 采用 `gzip`，以适配 Service Worker 的内置解压路径
 
 ### 性能对比
 
@@ -368,6 +326,14 @@ pnpm type-check
 pnpm publish-packages
 ```
 
+## 🌐 部署（Demo 到 GitHub Pages）
+
+```bash
+./deploy.sh
+```
+
+该脚本会依次构建 `core-utils`、`streamsight`、`demo-app`，并将 `apps/demo-app/dist` 推送到 `gh-pages` 分支。
+
 ## 📋 技术规范
 
 ### 核心特性
@@ -375,22 +341,22 @@ pnpm publish-packages
 - ✅ 基于 rrweb 的 DOM 快照与增量事件
 - ✅ MutationObserver 监听 DOM 变化
 - ✅ 事件批次处理（默认 80 条/批）
-- ✅ Web Worker 压缩处理
-- ✅ 脱敏规则支持（`.oo-mask` / `.oo-block`）
+- ✅ Web Worker 压缩处理（含 zstd/gzip）
+- ✅ 脱敏规则支持（`.ss-mask` / `.ss-block`）
 - ✅ 相对 URL 转绝对 URL
 - ✅ 脚本内容清理
 - ✅ 表单输入值处理
 - ✅ 网络重试与离线队列
 - ✅ iframe sandbox 安全回放
+- ✅ MySQL / 本地文件双存储后端
+- ✅ 会话聚合回放（多批次合并播放）
+- ✅ 响应式页面（Demo 与 Replay Platform）
 
 ### 待实现特性
 
-- ✅ ZSTD 压缩支持（基于 `@bokuweb/zstd-wasm`）
 - ⏳ Canvas 录制支持
-- ⏳ 移动端适配
 - ⏳ 实时流式传输
 - ⏳ 高级权限控制
-- ⏳ 数据库存储后端
 - ⏳ 回放性能优化
 
 ## 🤝 贡献指南
@@ -407,9 +373,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 🆘 支持
 
-- 📖 [文档](./docs/)
-- 🐛 [问题反馈](https://github.com/your-org/streamsight/issues)
-- 💬 [讨论区](https://github.com/your-org/streamsight/discussions)
+- 🐛 [问题反馈](https://github.com/Sunny-117/streamsight/issues)
+- 💬 [讨论区](https://github.com/Sunny-117/streamsight/discussions)
 
 ---
 

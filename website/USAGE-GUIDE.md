@@ -68,7 +68,7 @@ pnpm --filter @streamsight/demo-app dev
 
 ### ✅ 脱敏功能
 - [ ] 密码输入自动脱敏（显示为 `***`）
-- [ ] CSS 类脱敏（`.oo-mask` 类的元素）
+- [ ] CSS 类脱敏（`.ss-mask` 类的元素）
 - [ ] 敏感信息模式匹配（邮箱、手机号等）
 
 ### ✅ 数据处理
@@ -99,8 +99,8 @@ const recorder = init({
   
   // 脱敏配置
   privacy: {
-    maskSelectors: ['.oo-mask', '.sensitive'],
-    blockSelectors: ['.oo-block', '.private'],
+    maskSelectors: ['.ss-mask', '.sensitive'],
+    blockSelectors: ['.ss-block', '.private'],
     maskAllInputs: false,
     maskPasswords: true,
   },

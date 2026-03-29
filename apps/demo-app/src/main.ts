@@ -38,8 +38,8 @@ async function bootstrap() {
     batchSize: 20,
     batchTimeout: 10000,
     privacy: {
-      maskSelectors: ['.oo-mask', '.sensitive'],
-      blockSelectors: ['.oo-block', '.private'],
+      maskSelectors: ['.ss-mask', '.sensitive'],
+      blockSelectors: ['.ss-block', '.private'],
       maskAllInputs: false,
       maskPasswords: true,
     },

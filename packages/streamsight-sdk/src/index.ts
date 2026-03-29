@@ -24,9 +24,9 @@ export interface StreamsightConfig {
   batchTimeout?: number
   /** 脱敏配置 */
   privacy?: {
-    /** 自定义遮盖选择器，默认 ['.oo-mask'] */
+    /** 自定义遮盖选择器，默认 ['.ss-mask'] */
     maskSelectors?: string[]
-    /** 自定义阻止选择器，默认 ['.oo-block'] */
+    /** 自定义阻止选择器，默认 ['.ss-block'] */
     blockSelectors?: string[]
     /** 是否遮盖所有输入，默认 false */
     maskAllInputs?: boolean
@@ -108,8 +108,8 @@ export class StreamsightRecorder {
       batchSize: config.batchSize || 80,
       batchTimeout: config.batchTimeout || 30000,
       privacy: {
-        maskSelectors: ['.oo-mask'],
-        blockSelectors: ['.oo-block'],
+        maskSelectors: ['.ss-mask'],
+        blockSelectors: ['.ss-block'],
         maskAllInputs: false,
         maskPasswords: true,
         ...config.privacy,
