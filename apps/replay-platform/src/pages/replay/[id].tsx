@@ -33,7 +33,7 @@ export default function ReplayPage() {
   const { id, session } = router.query
   const playerRef = useRef<HTMLDivElement>(null)
   const playerInstanceRef = useRef<RRWebPlayerInstance | null>(null)
-  
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [metadata, setMetadata] = useState<ReplayMetadata | null>(null)
@@ -43,7 +43,6 @@ export default function ReplayPage() {
     if (id) {
       loadReplay(id as string)
     }
-    
     return () => {
       destroyPlayer()
     }
@@ -53,15 +52,14 @@ export default function ReplayPage() {
     try {
       setLoading(true)
       setError(null)
-
       if (session) {
         await loadSessionReplays(session as string)
       } else {
         await loadSingleReplay(replayId)
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : '加载回放失败')
-      console.error('加载回放失败:', err)
+      setError(err instanceof Error ? err.message : 'Failed to load replay')
+      console.error('Failed to load replay:', err)
     } finally {
       setLoading(false)
     }
@@ -69,17 +67,12 @@ export default function ReplayPage() {
 
   const loadSingleReplay = async (replayId: string) => {
     const metaResponse = await fetch(`http://localhost:3001/v1/replays/${replayId}`)
-    if (!metaResponse.ok) {
-      throw new Error(`获取元数据失败: ${metaResponse.status}`)
-    }
+    if (!metaResponse.ok) throw new Error(`Metadata fetch failed: ${metaResponse.status}`)
     const metaResult = await metaResponse.json()
     setMetadata(metaResult.data)
 
     const dataResponse = await fetch(`http://localhost:3001/v1/replays/${replayId}/blob?decompress=true`)
-    if (!dataResponse.ok) {
-      throw new Error(`获取回放数据失败: ${dataResponse.status}`)
-    }
-    
+    if (!dataResponse.ok) throw new Error(`Replay data fetch failed: ${dataResponse.status}`)
     const batchData: StreamsightBatch = await dataResponse.json()
     setEvents(batchData.events)
 
@@ -90,22 +83,16 @@ export default function ReplayPage() {
 
   const loadSessionReplays = async (sessionId: string) => {
     const listResponse = await fetch(`http://localhost:3001/v1/replays?sessionId=${sessionId}&limit=100`)
-    if (!listResponse.ok) {
-      throw new Error(`获取会话列表失败: ${listResponse.status}`)
-    }
-    
+    if (!listResponse.ok) throw new Error(`Session list fetch failed: ${listResponse.status}`)
     const listResult = await listResponse.json()
     const batches: ReplayMetadata[] = listResult.data
-    
-    if (batches.length === 0) {
-      throw new Error('会话中没有找到批次数据')
-    }
+
+    if (batches.length === 0) throw new Error('No batch data found in session')
 
     batches.sort((a, b) => a.batchIndex - b.batchIndex)
     setMetadata(batches[0])
 
     const allEvents: eventWithTime[] = []
-    
     for (const batch of batches) {
       const dataResponse = await fetch(`http://localhost:3001/v1/replays/${batch.replayId}/blob?decompress=true`)
       if (dataResponse.ok) {
@@ -124,11 +111,9 @@ export default function ReplayPage() {
 
   const initPlayer = async (replayEvents: eventWithTime[]) => {
     if (!playerRef.current) return
-
     try {
       const { default: RRWebPlayer } = await import('rrweb-player')
       destroyPlayer()
-      
       playerRef.current.innerHTML = ''
 
       playerInstanceRef.current = new RRWebPlayer({
@@ -144,30 +129,24 @@ export default function ReplayPage() {
             duration: 500,
             lineCap: 'round',
             lineWidth: 2,
-            strokeStyle: 'red',
+            strokeStyle: '#0071e3',
           },
         },
       })
-
-      console.log('rrweb-player 初始化成功，事件数:', replayEvents.length)
-    } catch (error) {
-      console.error('初始化播放器失败:', error)
-      setError('播放器初始化失败: ' + (error instanceof Error ? error.message : '未知错误'))
+      console.log('rrweb-player initialized, events:', replayEvents.length)
+    } catch (err) {
+      console.error('Player initialization failed:', err)
+      setError('Player failed: ' + (err instanceof Error ? err.message : 'Unknown error'))
     }
   }
 
   const destroyPlayer = () => {
-    if (!playerInstanceRef.current) {
-      return
-    }
-
+    if (!playerInstanceRef.current) return
     try {
       const instance = playerInstanceRef.current as DestroyablePlayer
-      if (typeof instance.$destroy === 'function') {
-        instance.$destroy()
-      }
+      if (typeof instance.$destroy === 'function') instance.$destroy()
     } catch (e) {
-      console.warn('清理播放器失败:', e)
+      console.warn('Player cleanup failed:', e)
     } finally {
       playerInstanceRef.current = null
     }
@@ -188,247 +167,398 @@ export default function ReplayPage() {
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
   }
 
-  if (loading) {
-    return (
-      <div className="container">
-        <div className="loading">
-          <div className="spinner"></div>
-          <p>加载回放数据中...</p>
-        </div>
-        <style jsx>{`
-          .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          }
-          .loading {
-            text-align: center;
-            padding: 60px 20px;
-          }
-          .spinner {
-            width: 40px;
-            height: 40px;
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 20px;
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}</style>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="container">
-        <div className="error">
-          <h2>❌ 加载失败</h2>
-          <p>{error}</p>
-          <button onClick={() => router.back()} className="back-btn">
-            返回列表
-          </button>
-        </div>
-        <style jsx>{`
-          .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          }
-          .error {
-            text-align: center;
-            padding: 60px 20px;
-            color: #e74c3c;
-          }
-          .back-btn {
-            padding: 10px 20px;
-            background: #3498db;
-            color: white;
-            border: none;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 14px;
-          }
-          .back-btn:hover {
-            background: #2980b9;
-          }
-        `}</style>
-      </div>
-    )
-  }
-
   const duration = events.length > 0 ? events[events.length - 1].timestamp - events[0].timestamp : 0
 
-  return (
-    <div className="container">
-      <header className="header">
-        <button onClick={() => router.back()} className="back-btn">
-          ← 返回列表
-        </button>
-        <h1>🎬 回放查看器</h1>
-        {metadata && (
-          <div className="metadata">
-            <span className="meta-item">📱 {metadata.appId}</span>
-            <span className="meta-item">🎯 {metadata.sessionId.substring(0, 20)}...</span>
-            <span className="meta-item">📦 批次 #{metadata.batchIndex}</span>
-            <span className="meta-item">👤 {metadata.userId || '匿名'}</span>
-            <span className="meta-item">💾 {formatFileSize(metadata.size)}</span>
-            <span className="meta-item">📊 {events.length} 事件</span>
-          </div>
-        )}
-      </header>
-
-      <div className="player-container">
-        <div ref={playerRef} className="player" />
+  // ===== Loading =====
+  if (loading) {
+    return (
+      <div className="page">
+        <div className="center-state">
+          <div className="spinner" />
+          <p className="center-text">Loading replay...</p>
+        </div>
+        <style jsx>{styles}</style>
       </div>
+    )
+  }
 
-      <div className="event-info">
-        <h3>📋 事件信息</h3>
-        <div className="event-stats">
-          <div className="stat-item">
-            <span className="stat-label">总事件数:</span>
-            <span className="stat-value">{events.length}</span>
+  // ===== Error =====
+  if (error) {
+    return (
+      <div className="page">
+        <div className="center-state">
+          <div className="error-icon">!</div>
+          <p className="center-title">Unable to Load</p>
+          <p className="center-text">{error}</p>
+          <button onClick={() => router.back()} className="btn btn-filled">
+            Go Back
+          </button>
+        </div>
+        <style jsx>{styles}</style>
+      </div>
+    )
+  }
+
+  return (
+    <div className="page">
+      {/* Navigation */}
+      <nav className="nav">
+        <div className="nav-inner">
+          <button onClick={() => router.back()} className="nav-back">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M15 18l-6-6 6-6"/>
+            </svg>
+            Sessions
+          </button>
+          <div className="nav-center">
+            <span className="nav-title">Replay Viewer</span>
           </div>
-          <div className="stat-item">
-            <span className="stat-label">录制时长:</span>
-            <span className="stat-value">{formatTime(duration)}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">压缩格式:</span>
-            <span className="stat-value">{metadata?.compression.toUpperCase()}</span>
-          </div>
-          <div className="stat-item">
-            <span className="stat-label">创建时间:</span>
-            <span className="stat-value">
-              {metadata ? new Date(metadata.createdAt).toLocaleString('zh-CN') : '-'}
-            </span>
+          <div className="nav-right">
+            {session && <span className="nav-badge">Full Session</span>}
           </div>
         </div>
-      </div>
+      </nav>
 
-      <style jsx>{`
-        .container {
-          max-width: 1400px;
-          margin: 0 auto;
-          padding: 20px;
-          font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-          line-height: 1.6;
-        }
-        
-        .header {
-          display: flex;
-          align-items: center;
-          gap: 20px;
-          margin-bottom: 30px;
-          padding: 20px;
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          flex-wrap: wrap;
-        }
-        
-        .back-btn {
-          padding: 8px 16px;
-          background: #6c757d;
-          color: white;
-          border: none;
-          border-radius: 6px;
-          cursor: pointer;
-          font-size: 14px;
-          transition: background 0.3s ease;
-        }
-        
-        .back-btn:hover {
-          background: #5a6268;
-        }
-        
-        .header h1 {
-          margin: 0;
-          color: #333;
-          flex: 1;
-        }
-        
-        .metadata {
-          display: flex;
-          gap: 15px;
-          flex-wrap: wrap;
-        }
-        
-        .meta-item {
-          font-size: 14px;
-          color: #6c757d;
-          background: #f8f9fa;
-          padding: 4px 8px;
-          border-radius: 4px;
-        }
-        
-        .player-container {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          overflow: hidden;
-          margin-bottom: 30px;
-        }
-        
-        .player {
-          width: 100%;
-          min-height: 600px;
-        }
-        
-        .event-info {
-          background: white;
-          border-radius: 12px;
-          box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-          padding: 20px;
-        }
-        
-        .event-info h3 {
-          margin: 0 0 20px 0;
-          color: #333;
-        }
-        
-        .event-stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 15px;
-        }
-        
-        .stat-item {
-          display: flex;
-          justify-content: space-between;
-          padding: 10px;
-          background: #f8f9fa;
-          border-radius: 6px;
-        }
-        
-        .stat-label {
-          color: #6c757d;
-          font-size: 14px;
-        }
-        
-        .stat-value {
-          color: #495057;
-          font-weight: 600;
-          font-size: 14px;
-        }
-        
-        @media (max-width: 768px) {
-          .header {
-            flex-direction: column;
-            align-items: flex-start;
-          }
-          
-          .metadata {
-            width: 100%;
-          }
-        }
-      `}</style>
+      <main className="main">
+        {/* Player */}
+        <div className="player-card">
+          <div ref={playerRef} className="player" />
+        </div>
+
+        {/* Stats Grid */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-value">{events.length.toLocaleString()}</span>
+            <span className="stat-label">Events</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{formatTime(duration)}</span>
+            <span className="stat-label">Duration</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{metadata?.compression.toUpperCase() || '-'}</span>
+            <span className="stat-label">Compression</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{metadata ? formatFileSize(metadata.size) : '-'}</span>
+            <span className="stat-label">Size</span>
+          </div>
+        </div>
+
+        {/* Metadata */}
+        {metadata && (
+          <div className="detail-card">
+            <h3 className="detail-heading">Session Details</h3>
+            <div className="detail-list">
+              <div className="detail-row">
+                <span className="detail-label">App</span>
+                <span className="detail-value">{metadata.appId}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">User</span>
+                <span className="detail-value">{metadata.userId || 'Anonymous'}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Batch</span>
+                <span className="detail-value">#{metadata.batchIndex}</span>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Session ID</span>
+                <code className="detail-code">{metadata.sessionId.substring(0, 28)}...</code>
+              </div>
+              <div className="detail-row">
+                <span className="detail-label">Recorded</span>
+                <span className="detail-value">
+                  {new Date(metadata.createdAt).toLocaleString('en-US', {
+                    month: 'short', day: 'numeric', year: 'numeric',
+                    hour: '2-digit', minute: '2-digit',
+                  })}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+
+      <footer className="footer">
+        <p>StreamSight Replay Platform</p>
+      </footer>
+
+      <style jsx>{styles}</style>
     </div>
   )
 }
+
+const styles = `
+  /* ===== Base ===== */
+  .page {
+    min-height: 100vh;
+    background: #f5f5f7;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+    color: #1d1d1f;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    letter-spacing: -0.022em;
+    line-height: 1.47;
+  }
+
+  /* ===== Nav ===== */
+  .nav {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    background: rgba(245, 245, 247, 0.72);
+    backdrop-filter: saturate(180%) blur(20px);
+    -webkit-backdrop-filter: saturate(180%) blur(20px);
+    border-bottom: 0.5px solid rgba(60, 60, 67, 0.06);
+    height: 52px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .nav-inner {
+    width: 100%;
+    max-width: 1200px;
+    padding: 0 22px;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+  }
+  .nav-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 400;
+    color: #0071e3;
+    cursor: pointer;
+    padding: 6px 10px 6px 6px;
+    border-radius: 8px;
+    transition: background 0.15s ease;
+    letter-spacing: -0.01em;
+    justify-self: start;
+  }
+  .nav-back:hover {
+    background: rgba(0, 113, 227, 0.06);
+  }
+  .nav-center {
+    text-align: center;
+  }
+  .nav-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: #1d1d1f;
+    letter-spacing: -0.01em;
+  }
+  .nav-right {
+    justify-self: end;
+  }
+  .nav-badge {
+    font-size: 11px;
+    font-weight: 600;
+    color: #5856d6;
+    background: rgba(88, 86, 214, 0.1);
+    padding: 3px 10px;
+    border-radius: 980px;
+    letter-spacing: 0.01em;
+  }
+
+  /* ===== Main ===== */
+  .main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px 22px 80px;
+  }
+
+  /* ===== Player ===== */
+  .player-card {
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  }
+  .player {
+    width: 100%;
+    min-height: 520px;
+  }
+
+  /* ===== Stats Grid ===== */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: rgba(60, 60, 67, 0.06);
+    border-radius: 16px;
+    overflow: hidden;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    background: #fff;
+    padding: 20px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .stat-value {
+    font-size: 24px;
+    font-weight: 700;
+    letter-spacing: -0.025em;
+    color: #1d1d1f;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-label {
+    font-size: 12px;
+    font-weight: 500;
+    color: #86868b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  /* ===== Detail Card ===== */
+  .detail-card {
+    background: #fff;
+    border-radius: 16px;
+    padding: 24px;
+    margin-bottom: 16px;
+  }
+  .detail-heading {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+  .detail-list {
+    display: flex;
+    flex-direction: column;
+  }
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 0;
+  }
+  .detail-row + .detail-row {
+    border-top: 0.5px solid rgba(60, 60, 67, 0.06);
+  }
+  .detail-label {
+    font-size: 15px;
+    color: #1d1d1f;
+  }
+  .detail-value {
+    font-size: 15px;
+    color: #86868b;
+    text-align: right;
+  }
+  .detail-code {
+    font-family: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, monospace;
+    font-size: 13px;
+    color: #86868b;
+    background: #f5f5f7;
+    padding: 3px 8px;
+    border-radius: 6px;
+  }
+
+  /* ===== Center States ===== */
+  .center-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 80vh;
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .spinner {
+    width: 28px;
+    height: 28px;
+    border: 2.5px solid #d2d2d7;
+    border-top-color: #1d1d1f;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-bottom: 16px;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .center-title {
+    font-size: 19px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .center-text {
+    font-size: 15px;
+    color: #86868b;
+    margin: 0 0 20px;
+  }
+  .error-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: rgba(255, 59, 48, 0.1);
+    color: #ff3b30;
+    font-size: 20px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+  }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 15px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+    border-radius: 980px;
+    padding: 11px 22px;
+    text-decoration: none;
+    transition: opacity 0.15s ease, transform 0.1s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active {
+    transform: scale(0.97);
+  }
+  .btn-filled {
+    background: #0071e3;
+    color: #fff;
+  }
+  .btn-filled:hover {
+    opacity: 0.88;
+  }
+
+  /* ===== Footer ===== */
+  .footer {
+    text-align: center;
+    padding: 24px 22px 40px;
+    font-size: 13px;
+    color: #86868b;
+  }
+  .footer p { margin: 0; }
+
+  /* ===== Responsive ===== */
+  @media (max-width: 734px) {
+    .stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+    .player {
+      min-height: 360px;
+    }
+    .nav-inner {
+      grid-template-columns: auto 1fr auto;
+    }
+    .nav-center {
+      display: none;
+    }
+  }
+` as unknown as TemplateStringsArray

@@ -1,313 +1,311 @@
 import { init, start, stop, flush, setUser } from 'streamsight'
+import { initReplayViewer } from './replay-viewer'
 
-// 初始化 SDK
-init({
-  appId: 'demo-app',
-  apiEndpoint: 'http://localhost:3001',
-  userId: 'demo-user-' + Math.random().toString(36).substr(2, 9),
-  batchSize: 20, // 演示用较小批次
-  batchTimeout: 10000, // 10 秒超时
-  privacy: {
-    maskSelectors: ['.oo-mask', '.sensitive'],
-    blockSelectors: ['.oo-block', '.private'],
-    maskAllInputs: false,
-    maskPasswords: true,
-  },
-  compression: {
-    type: 'zstd',
-    level: 3,
-  },
-})
+// ===== Environment Detection =====
+// GH Pages build sets base to '/streamsight/', so even when previewed on localhost
+// we should use SW mode. Only true localhost dev (base='/') uses the real backend.
+const isGHPagesBuild = import.meta.env.BASE_URL !== '/'
+const isLocal = !isGHPagesBuild && (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+const apiEndpoint = isLocal ? 'http://localhost:3001' : ''
 
-// DOM 元素
+// ===== Service Worker Registration (for GH Pages local mode) =====
+async function setupServiceWorker() {
+  if (isLocal || !('serviceWorker' in navigator)) return
+  try {
+    await navigator.serviceWorker.register(import.meta.env.BASE_URL + 'sw.js')
+    await navigator.serviceWorker.ready
+    // On first load, the SW is active but hasn't claimed this page yet.
+    // Wait for clients.claim() to finish so fetches are actually intercepted.
+    if (!navigator.serviceWorker.controller) {
+      await new Promise<void>((resolve) => {
+        navigator.serviceWorker.addEventListener('controllerchange', () => resolve(), { once: true })
+      })
+    }
+    console.log('[StreamSight] Service Worker active — local IndexedDB mode')
+  } catch (err) {
+    console.warn('[StreamSight] SW registration failed:', err)
+  }
+}
+
+// ===== Initialize SDK =====
+async function bootstrap() {
+  await setupServiceWorker()
+
+  init({
+    appId: 'demo-app',
+    apiEndpoint,
+    userId: 'demo-user-' + Math.random().toString(36).substr(2, 9),
+    batchSize: 20,
+    batchTimeout: 10000,
+    privacy: {
+      maskSelectors: ['.oo-mask', '.sensitive'],
+      blockSelectors: ['.oo-block', '.private'],
+      maskAllInputs: false,
+      maskPasswords: true,
+    },
+    compression: {
+      type: isLocal ? 'zstd' : 'gzip',
+      level: 3,
+    },
+  })
+
+  // Init replay viewer
+  const replayContainer = document.getElementById('replayContainer')
+  if (replayContainer) {
+    initReplayViewer(replayContainer, apiEndpoint)
+  }
+
+  console.log('[StreamSight] Demo app loaded' + (isLocal ? ' (local dev)' : ' (GH Pages mode)'))
+  showToast('Welcome to StreamSight', '\u25B6')
+}
+
+bootstrap()
+
+// ===== DOM References =====
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement
 const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement
 const flushBtn = document.getElementById('flushBtn') as HTMLButtonElement
 const viewReplaysBtn = document.getElementById('viewReplaysBtn') as HTMLButtonElement
-const status = document.getElementById('status') as HTMLDivElement
+const navStatus = document.getElementById('navStatus') as HTMLDivElement
+const navStatusText = document.getElementById('navStatusText') as HTMLSpanElement
 
-// 录制状态
 let isRecording = false
 
-// 开始录制
+// ===== Toast System =====
+function showToast(message: string, icon: string = '') {
+  const container = document.getElementById('toastContainer')!
+  const toast = document.createElement('div')
+  toast.className = 'toast'
+  toast.innerHTML = `${icon ? `<span class="toast-icon">${icon}</span>` : ''}<span>${message}</span>`
+  container.appendChild(toast)
+
+  setTimeout(() => {
+    toast.classList.add('leaving')
+    toast.addEventListener('animationend', () => toast.remove())
+  }, 3000)
+}
+
+// ===== Recording Controls =====
 startBtn.addEventListener('click', async () => {
   try {
-    // 显示加载状态
-    startBtn.textContent = '正在启动...'
+    startBtn.textContent = 'Starting...'
     startBtn.disabled = true
-    
     await start()
     isRecording = true
     updateUI()
-    console.log('录制已开始')
-    
-    // 显示成功提示
-    showNotification('✅ 录制已开始', 'success')
+    showToast('Recording started', '\u25CF')
   } catch (error) {
-    console.error('启动录制失败:', error)
-    alert('启动录制失败: ' + (error as Error).message)
-    startBtn.textContent = '开始录制'
+    console.error('Failed to start recording:', error)
+    showToast('Failed to start: ' + (error as Error).message, '\u26A0')
+    startBtn.textContent = 'Start Recording'
     startBtn.disabled = false
   }
 })
 
-// 停止录制
 stopBtn.addEventListener('click', () => {
   try {
     stop()
     isRecording = false
     updateUI()
-    console.log('录制已停止')
-    
-    // 显示成功提示
-    showNotification('⏹️ 录制已停止，数据已保存', 'success')
-    
-    // 提示用户可以查看数据
-    setTimeout(() => {
-      showNotification('💡 提示：点击"本地数据查看器"可查看录制的数据', 'info')
-    }, 2000)
+    showToast('Recording stopped. Data saved.', '\u2713')
   } catch (error) {
-    console.error('停止录制失败:', error)
+    console.error('Failed to stop recording:', error)
   }
 })
 
-// 刷新批次
 flushBtn.addEventListener('click', async () => {
   try {
     await flush()
-    console.log('批次已刷新')
+    showToast('Batch flushed', '\u2191')
   } catch (error) {
-    console.error('刷新批次失败:', error)
+    console.error('Failed to flush batch:', error)
   }
 })
 
-// 查看回放
 viewReplaysBtn.addEventListener('click', () => {
-  window.open('http://localhost:3000', '_blank')
+  const section = document.getElementById('replaySection')
+  if (section) {
+    section.scrollIntoView({ behavior: 'smooth' })
+  }
 })
 
-// 更新 UI 状态
 function updateUI() {
   if (isRecording) {
     startBtn.disabled = true
+    startBtn.textContent = 'Recording'
     stopBtn.disabled = false
-    status.textContent = '🔴 录制中...'
-    status.className = 'status recording'
+    stopBtn.className = 'btn btn-filled-red'
+    navStatus.className = 'nav-status recording'
+    navStatusText.textContent = 'Recording'
   } else {
     startBtn.disabled = false
+    startBtn.textContent = 'Start Recording'
     stopBtn.disabled = true
-    status.textContent = '⏹️ 录制已停止'
-    status.className = 'status stopped'
+    stopBtn.className = 'btn btn-gray'
+    navStatus.className = 'nav-status'
+    navStatusText.textContent = 'Ready'
   }
 }
 
-// 交互事件处理
-let clickCounts = {
-  click1: 0,
-  click2: 0,
-  hover: 0,
-}
+// ===== Click Interaction Counters =====
+const clickCounts = { click1: 0, click2: 0, hover: 0 }
 
-// 点击事件
 document.addEventListener('click', (event) => {
   const target = event.target as HTMLElement
-  if (!target || typeof target.getAttribute !== 'function') return
-  
-  const action = target.getAttribute('data-action') || target.closest('[data-action]')?.getAttribute('data-action')
-  
-  if (action) {
-    switch (action) {
-      case 'click1':
-        clickCounts.click1++
-        const click1Element = document.getElementById('click1Count')
-        if (click1Element) {
-          click1Element.textContent = clickCounts.click1.toString()
-        }
-        break
-      case 'modal':
-        const modalElement = document.getElementById('modal')
-        if (modalElement) {
-          modalElement.style.display = 'block'
-        }
-        break
-    }
+  if (!target || typeof target.closest !== 'function') return
+
+  const card = target.closest('[data-action]') as HTMLElement | null
+  if (!card) return
+
+  const action = card.getAttribute('data-action')
+
+  switch (action) {
+    case 'click1':
+      clickCounts.click1++
+      animateCounter('click1Count', clickCounts.click1)
+      break
+    case 'modal':
+      openModal()
+      break
   }
 })
 
-// 双击事件
 document.addEventListener('dblclick', (event) => {
   const target = event.target as HTMLElement
-  if (!target || typeof target.getAttribute !== 'function') return
-  
-  const action = target.getAttribute('data-action') || target.closest('[data-action]')?.getAttribute('data-action')
-  
-  if (action === 'click2') {
+  if (!target || typeof target.closest !== 'function') return
+
+  const card = target.closest('[data-action="click2"]')
+  if (card) {
     clickCounts.click2++
-    const click2Element = document.getElementById('click2Count')
-    if (click2Element) {
-      click2Element.textContent = clickCounts.click2.toString()
-    }
+    animateCounter('click2Count', clickCounts.click2)
   }
 })
 
-// 悬停事件
 document.addEventListener('mouseenter', (event) => {
   const target = event.target as HTMLElement
-  if (!target || typeof target.getAttribute !== 'function') return
-  
-  const action = target.getAttribute('data-action')
-  
-  if (action === 'hover') {
+  if (!target || typeof target.closest !== 'function') return
+
+  const card = target.closest('[data-action="hover"]')
+  if (card) {
     clickCounts.hover++
-    const hoverElement = document.getElementById('hoverCount')
-    if (hoverElement) {
-      hoverElement.textContent = clickCounts.hover.toString()
-    }
+    animateCounter('hoverCount', clickCounts.hover)
   }
 }, true)
 
-// 关闭模态框
-document.getElementById('closeModalBtn')?.addEventListener('click', () => {
-  document.getElementById('modal')!.style.display = 'none'
+function animateCounter(id: string, value: number) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.textContent = value.toString()
+  el.style.transform = 'scale(1.1)'
+  el.style.transition = 'transform 0.15s ease'
+  setTimeout(() => {
+    el.style.transform = 'scale(1)'
+  }, 150)
+}
+
+// ===== Modal =====
+const modal = document.getElementById('modal')!
+
+function openModal() {
+  modal.classList.add('visible')
+}
+
+function closeModal() {
+  modal.classList.remove('visible')
+}
+
+document.getElementById('closeModalBtn')?.addEventListener('click', closeModal)
+document.getElementById('closeModalBtn2')?.addEventListener('click', closeModal)
+
+modal.addEventListener('click', (event) => {
+  if (event.target === modal) closeModal()
 })
 
-// 点击模态框背景关闭
-document.getElementById('modal')?.addEventListener('click', (event) => {
-  if (event.target === event.currentTarget) {
-    document.getElementById('modal')!.style.display = 'none'
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && modal.classList.contains('visible')) {
+    closeModal()
   }
 })
 
-// 动态内容
+// ===== Dynamic Content =====
 let dynamicContentCount = 0
+const dynamicContainer = document.getElementById('dynamicContent')!
+const dynamicEmpty = document.getElementById('dynamicEmpty')!
+
+function updateDynamicEmpty() {
+  dynamicEmpty.style.display = dynamicContainer.children.length === 0 ? 'block' : 'none'
+}
 
 document.getElementById('addContentBtn')?.addEventListener('click', () => {
-  const container = document.getElementById('dynamicContent')!
-  const div = document.createElement('div')
-  div.style.cssText = 'padding: 10px; margin: 5px 0; background: #e3f2fd; border-radius: 4px;'
-  div.innerHTML = `
-    <p>动态内容 #${++dynamicContentCount}</p>
-    <input type="text" placeholder="动态输入框 ${dynamicContentCount}">
-    <button onclick="this.parentElement.remove()">删除此项</button>
+  dynamicContentCount++
+  const item = document.createElement('div')
+  item.className = 'dynamic-item'
+  item.innerHTML = `
+    <div class="dynamic-item-left">
+      <div class="dynamic-item-number">${dynamicContentCount}</div>
+      <input type="text" placeholder="Dynamic input #${dynamicContentCount}">
+    </div>
+    <button class="btn-remove" aria-label="Remove">&times;</button>
   `
-  container.appendChild(div)
+  item.querySelector('.btn-remove')?.addEventListener('click', () => {
+    item.style.opacity = '0'
+    item.style.transform = 'translateX(20px)'
+    item.style.transition = 'opacity 0.2s ease, transform 0.2s ease'
+    setTimeout(() => {
+      item.remove()
+      updateDynamicEmpty()
+    }, 200)
+  })
+  dynamicContainer.appendChild(item)
+  updateDynamicEmpty()
 })
 
 document.getElementById('removeContentBtn')?.addEventListener('click', () => {
-  const container = document.getElementById('dynamicContent')!
-  const lastChild = container.lastElementChild
-  if (lastChild) {
-    lastChild.remove()
+  const last = dynamicContainer.lastElementChild as HTMLElement | null
+  if (last) {
+    last.style.opacity = '0'
+    last.style.transform = 'translateX(20px)'
+    last.style.transition = 'opacity 0.2s ease, transform 0.2s ease'
+    setTimeout(() => {
+      last.remove()
+      updateDynamicEmpty()
+    }, 200)
   }
 })
 
-// 表单输入事件
+// ===== Form Input Logging =====
 document.querySelectorAll('input, textarea, select').forEach(element => {
-  element.addEventListener('input', (event) => {
-    const target = event.target as HTMLInputElement
-    console.log('输入事件:', target.id, target.value.length > 0 ? '有内容' : '空')
-  })
-  
   element.addEventListener('focus', (event) => {
     const target = event.target as HTMLInputElement
-    console.log('焦点事件:', target.id)
+    console.log('Focus:', target.id)
   })
-  
+
   element.addEventListener('blur', (event) => {
     const target = event.target as HTMLInputElement
-    console.log('失焦事件:', target.id)
+    console.log('Blur:', target.id)
   })
 })
 
-// 滚动事件
+// ===== Scroll & Resize Logging =====
 let scrollTimeout: number
 window.addEventListener('scroll', () => {
   clearTimeout(scrollTimeout)
   scrollTimeout = window.setTimeout(() => {
-    console.log('滚动位置:', window.scrollY)
+    console.log('Scroll Y:', window.scrollY)
   }, 100)
 })
 
-// 窗口大小变化
 window.addEventListener('resize', () => {
-  console.log('窗口大小:', window.innerWidth, 'x', window.innerHeight)
+  console.log('Viewport:', window.innerWidth, 'x', window.innerHeight)
 })
 
-// 页面可见性变化
 document.addEventListener('visibilitychange', () => {
-  console.log('页面可见性:', document.hidden ? '隐藏' : '可见')
+  console.log('Visibility:', document.hidden ? 'hidden' : 'visible')
 })
 
-// 设置用户信息
+// ===== Set User =====
 setUser('demo-user', {
-  name: '演示用户',
+  name: 'Demo User',
   role: 'tester',
   timestamp: Date.now(),
 })
-
-// 通知函数
-function showNotification(message: string, type: 'success' | 'error' | 'info' = 'info') {
-  const notification = document.createElement('div')
-  notification.textContent = message
-  notification.style.cssText = `
-    position: fixed;
-    top: 80px;
-    right: 20px;
-    padding: 15px 20px;
-    border-radius: 8px;
-    color: white;
-    font-weight: 500;
-    z-index: 10000;
-    animation: slideIn 0.3s ease-out;
-    max-width: 300px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-  `
-  
-  if (type === 'success') {
-    notification.style.background = '#4CAF50'
-  } else if (type === 'error') {
-    notification.style.background = '#f44336'
-  } else {
-    notification.style.background = '#2196F3'
-  }
-  
-  document.body.appendChild(notification)
-  
-  setTimeout(() => {
-    notification.style.animation = 'slideOut 0.3s ease-in'
-    setTimeout(() => notification.remove(), 300)
-  }, 3000)
-}
-
-// 添加动画样式
-const style = document.createElement('style')
-style.textContent = `
-  @keyframes slideIn {
-    from {
-      transform: translateX(400px);
-      opacity: 0;
-    }
-    to {
-      transform: translateX(0);
-      opacity: 1;
-    }
-  }
-  
-  @keyframes slideOut {
-    from {
-      transform: translateX(0);
-      opacity: 1;
-    }
-    to {
-      transform: translateX(400px);
-      opacity: 0;
-    }
-  }
-`
-document.head.appendChild(style)
-
-console.log('StreamSight 演示应用已加载')
-console.log('请点击"开始录制"按钮开始录制用户行为')
-
-// 显示欢迎提示
-showNotification('👋 欢迎使用 StreamSight！点击"开始录制"开始', 'info')

@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  base: process.env.DEPLOY_GH_PAGES ? '/streamsight/' : '/',
   server: {
     port: 5173,
     host: true,
@@ -16,6 +17,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-  exclude: ['rrweb', 'streamsight', 'streamsight-core-utils', '@bokuweb/zstd-wasm'],
+  exclude: ['rrweb', 'rrweb-player', 'streamsight', 'streamsight-core-utils', '@bokuweb/zstd-wasm'],
   },
 })
