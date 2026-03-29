@@ -202,7 +202,7 @@
               'x-session-id': batch.sessionId,
               'x-batch-index': batch.batchIndex.toString(),
               'x-ts': batch.timestamp.toString(),
-              'x-compression': 'gzip'
+              'x-compression': 'zstd'
             },
             body: compressed
           })

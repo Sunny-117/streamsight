@@ -115,8 +115,8 @@ export class StreamsightRecorder {
         ...config.privacy,
       },
       compression: {
-        type: 'gzip',
-        level: 6,
+        type: 'zstd',
+        level: 3,
         ...config.compression,
       },
       network: {

@@ -261,24 +261,26 @@ import { gzip, gunzip } from 'fflate'
 
 ### 升级到 ZSTD（推荐）
 
-1. **安装 zstd-wasm**
+1. **安装维护中的 ZSTD WASM 库**
 ```bash
-pnpm add zstd-wasm
+pnpm --filter streamsight-core-utils add @bokuweb/zstd-wasm
 ```
 
 2. **更新压缩适配器**
 ```typescript
 // packages/core-utils/src/compression.ts
-import { compress as zstdCompress, decompress as zstdDecompress } from 'zstd-wasm'
+import { init, compress, decompress } from '@bokuweb/zstd-wasm'
 
 // 在 CompressionAdapter 类中添加
+await init()
+
 private static async compressZstd(data: Uint8Array, level: number): Promise<ArrayBuffer> {
-  const compressed = await zstdCompress(data, level)
+  const compressed = compress(data, level)
   return compressed.buffer
 }
 
 private static async decompressZstd(data: Uint8Array): Promise<string> {
-  const decompressed = await zstdDecompress(data)
+  const decompressed = decompress(data)
   const decoder = new TextDecoder()
   return decoder.decode(decompressed)
 }
@@ -287,12 +289,7 @@ private static async decompressZstd(data: Uint8Array): Promise<string> {
 3. **更新支持检测**
 ```typescript
 static isZstdSupported(): boolean {
-  try {
-    require('zstd-wasm')
-    return true
-  } catch {
-    return false
-  }
+  return typeof WebAssembly !== 'undefined'
 }
 ```
 
@@ -388,7 +385,7 @@ pnpm publish-packages
 
 ### 待实现特性
 
-- ⏳ ZSTD 压缩支持
+- ✅ ZSTD 压缩支持（基于 `@bokuweb/zstd-wasm`）
 - ⏳ Canvas 录制支持
 - ⏳ 移动端适配
 - ⏳ 实时流式传输

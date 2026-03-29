@@ -4,6 +4,7 @@ export default defineConfig({
   entry: ['src/index.ts'],
   format: ['cjs', 'esm'],
   dts: true,
+  external: ['@bokuweb/zstd-wasm'],
   splitting: false,
   sourcemap: true,
   clean: true,

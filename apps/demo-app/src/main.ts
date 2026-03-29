@@ -14,8 +14,8 @@ init({
     maskPasswords: true,
   },
   compression: {
-    type: 'gzip',
-    level: 6,
+    type: 'zstd',
+    level: 3,
   },
 })
 

@@ -1,4 +1,5 @@
 import type { WorkerMessage, WorkerResponse, CompressionType } from './types'
+import { CompressionAdapter } from './compression'
 
 export class WorkerBridge {
   private worker: Worker | null = null
@@ -34,9 +35,14 @@ export class WorkerBridge {
 
   async compress(
     data: string,
-    type: CompressionType = 'gzip',
+    type: CompressionType = 'zstd',
     level: number = 6
   ): Promise<ArrayBuffer> {
+    if (type === 'zstd') {
+      // zstd-wasm 在主线程上执行，避免内联 worker 里加载 wasm 的兼容性问题。
+      return CompressionAdapter.compress(data, type, level)
+    }
+
     if (!this.worker) {
       throw new Error('Worker 未初始化')
     }
@@ -60,6 +66,10 @@ export class WorkerBridge {
     data: ArrayBuffer,
     type: CompressionType = 'gzip'
   ): Promise<string> {
+    if (type === 'zstd') {
+      return CompressionAdapter.decompress(data, type)
+    }
+
     if (!this.worker) {
       throw new Error('Worker 未初始化')
     }

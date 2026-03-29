@@ -36,7 +36,7 @@ export class MySQLStorage {
           batch_index INT NOT NULL,
           timestamp BIGINT NOT NULL,
           user_id VARCHAR(100),
-          compression VARCHAR(20) NOT NULL DEFAULT 'gzip',
+          compression VARCHAR(20) NOT NULL DEFAULT 'zstd',
           size INT NOT NULL,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
           INDEX idx_session_id (session_id),

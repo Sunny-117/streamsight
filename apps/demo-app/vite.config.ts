@@ -16,6 +16,6 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
-  exclude: ['rrweb', 'streamsight', 'streamsight-core-utils'],
+  exclude: ['rrweb', 'streamsight', 'streamsight-core-utils', '@bokuweb/zstd-wasm'],
   },
 })

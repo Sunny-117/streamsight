@@ -22,6 +22,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@bokuweb/zstd-wasm": "^0.0.27",
     "fflate": "^0.8.1"
   },
   "devDependencies": {
