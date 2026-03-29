@@ -1,10 +1,11 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import { config } from 'dotenv'
+import path from 'path'
 import { replayRoutes } from './routes/replays'
 
 // 加载环境变量
-config()
+config({ path: path.resolve(__dirname, '../.env') })
 
 const fastify = Fastify({
   logger: true,

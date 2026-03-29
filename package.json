@@ -14,7 +14,11 @@
     "demo": "pnpm --filter @streamsight/demo-app dev",
     "backend": "pnpm --filter @streamsight/backend-api dev",
     "replay": "pnpm --filter @streamsight/replay-platform dev",
-    "e2e": "concurrently \"pnpm backend\" \"pnpm demo\" \"pnpm replay\""
+    "e2e": "concurrently \"pnpm backend\" \"pnpm demo\" \"pnpm replay\"",
+    "backend:file": "STORAGE_MODE=file pnpm --filter @streamsight/backend-api dev",
+    "backend:sql": "STORAGE_MODE=pgsql PGSQL_HOST=localhost PGSQL_PORT=${STREAMSIGHT_PG_PORT:-55432} PGSQL_USER=streamsight PGSQL_PASSWORD=streamsight PGSQL_DATABASE=streamsight pnpm --filter @streamsight/backend-api dev",
+    "db:up": "docker compose -f docker-compose.pgsql.yml up -d",
+    "db:down": "docker compose -f docker-compose.pgsql.yml down"
   },
   "devDependencies": {
     "@changesets/cli": "^2.26.2",

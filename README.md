@@ -24,9 +24,11 @@ pnpm build
 
 1. **启动后端服务**
 ```bash
-pnpm backend
-# 或者
-pnpm --filter @streamsight/backend-api dev
+# 文件存储模式（默认，写入 packages/backend-api/data）
+pnpm backend:file
+
+# PostgreSQL 存储模式（写入数据库，不落本地文件）
+pnpm backend:sql
 ```
 
 2. **启动演示应用**
@@ -70,7 +72,7 @@ pnpm e2e
 - Monorepo 项目结构搭建
 - 核心 SDK（rrweb 录制、批次处理、网络重试与离线队列）
 - ZSTD / GZIP 压缩链路（含 Web Worker 与 `@bokuweb/zstd-wasm`）
-- 后端 API 服务（支持本地文件和 MySQL 存储）
+- 后端 API 服务（支持本地文件和 PostgreSQL 存储）
 - Demo 应用内置会话列表与回放播放器（`apps/demo-app/src/replay-viewer.ts`）
 - Replay Platform 支持批次回放与整会话聚合回放
 - GitHub Pages 部署脚本与 Service Worker 本地 IndexedDB 模式
@@ -212,33 +214,42 @@ addIgnoreSelector(selector: string): void
 
 ```bash
 # 使用默认配置
-pnpm backend
+pnpm backend:file
 ```
 
-### MySQL 数据库存储
+### PostgreSQL 数据库存储
 
-1. **准备 MySQL 数据库**
+1. **准备 PostgreSQL 数据库**
 ```sql
-CREATE DATABASE streamsight CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER 'streamsight'@'localhost' IDENTIFIED BY 'your_password';
-GRANT ALL PRIVILEGES ON streamsight.* TO 'streamsight'@'localhost';
-FLUSH PRIVILEGES;
+CREATE DATABASE streamsight;
+CREATE USER streamsight WITH PASSWORD 'your_password';
+GRANT ALL PRIVILEGES ON DATABASE streamsight TO streamsight;
 ```
 
-2. **配置环境变量**
+2. **配置环境变量（手动切换存储模式）**
 ```bash
 # 编辑 packages/backend-api/.env
-USE_MYSQL=true
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=streamsight
-MYSQL_PASSWORD=your_password
-MYSQL_DATABASE=streamsight
+STORAGE_MODE=pgsql
+PGSQL_HOST=localhost
+PGSQL_PORT=55432
+PGSQL_USER=streamsight
+PGSQL_PASSWORD=your_password
+PGSQL_DATABASE=streamsight
 ```
 
-3. **启动服务**
+3. **启动服务（SQL 模式）**
 ```bash
-pnpm backend
+pnpm backend:sql
+```
+
+4. **可选：Docker 一键启动本地 PostgreSQL**
+```bash
+pnpm db:up
+# 如端口冲突可改宿主机端口（示例 55433）
+STREAMSIGHT_PG_PORT=55433 pnpm db:up
+
+# 停止并清理容器
+pnpm db:down
 ```
 
 数据库表会自动创建，包括：
@@ -348,7 +359,7 @@ pnpm publish-packages
 - ✅ 表单输入值处理
 - ✅ 网络重试与离线队列
 - ✅ iframe sandbox 安全回放
-- ✅ MySQL / 本地文件双存储后端
+- ✅ PostgreSQL / 本地文件双存储后端
 - ✅ 会话聚合回放（多批次合并播放）
 - ✅ 响应式页面（Demo 与 Replay Platform）
 

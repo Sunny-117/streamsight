@@ -6,22 +6,25 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsx watch src/index.ts",
+    "dev:file": "STORAGE_MODE=file tsx watch src/index.ts",
+    "dev:sql": "STORAGE_MODE=pgsql PGSQL_HOST=localhost PGSQL_PORT=${STREAMSIGHT_PG_PORT:-55432} PGSQL_USER=streamsight PGSQL_PASSWORD=streamsight PGSQL_DATABASE=streamsight tsx watch src/index.ts",
     "start": "node dist/index.js",
     "clean": "rm -rf dist",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
-    "fastify": "^4.24.3",
     "@fastify/cors": "^8.4.0",
     "@fastify/multipart": "^8.0.0",
-    "uuid": "^9.0.1",
-    "mysql2": "^3.6.5",
     "dotenv": "^16.3.1",
-  "streamsight-core-utils": "workspace:*"
+    "fastify": "^4.24.3",
+    "pg": "^8.13.1",
+    "streamsight-core-utils": "workspace:*",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
-    "@types/uuid": "^9.0.7",
     "@types/node": "^20.8.0",
+    "@types/pg": "^8.11.10",
+    "@types/uuid": "^9.0.7",
     "tsx": "^4.6.2",
     "typescript": "^5.2.2"
   }

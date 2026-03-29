@@ -1,0 +1,21 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: streamsight-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: streamsight
+      POSTGRES_PASSWORD: streamsight
+      POSTGRES_DB: streamsight
+    ports:
+      - "${STREAMSIGHT_PG_PORT:-55432}:5432"
+    volumes:
+      - streamsight_pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U streamsight -d streamsight"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  streamsight_pg_data:

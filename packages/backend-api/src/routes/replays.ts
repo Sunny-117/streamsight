@@ -1,23 +1,48 @@
 import { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify'
 import { v4 as uuidv4 } from 'uuid'
 import { FileStorage } from '../storage/file-storage'
-import { MySQLStorage } from '../storage/mysql-storage'
+import { PgSQLStorage } from '../storage/pgsql-storage'
 import { CompressionAdapter } from 'streamsight-core-utils'
+
+type StorageMode = 'file' | 'pgsql'
+
+function parseBoolean(value: string | undefined): boolean {
+  if (!value) return false
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase())
+}
+
+function resolveStorageMode(): StorageMode {
+  const rawMode = (process.env.STORAGE_MODE || '').toLowerCase().trim()
+  if (['pgsql', 'postgres', 'postgresql', 'sql', 'db'].includes(rawMode)) {
+    return 'pgsql'
+  }
+  if (rawMode === 'file') {
+    return 'file'
+  }
+  return 'file'
+}
 
 // 根据环境变量选择存储方式
 const createStorage = () => {
-  if (process.env.USE_MYSQL === 'true') {
-    const mysqlConfig = {
-      host: process.env.MYSQL_HOST || 'localhost',
-      port: parseInt(process.env.MYSQL_PORT || '3306'),
-      user: process.env.MYSQL_USER || 'root',
-      password: process.env.MYSQL_PASSWORD || '',
-      database: process.env.MYSQL_DATABASE || 'streamsight',
+  const mode = resolveStorageMode()
+
+  if (mode === 'pgsql') {
+    const pgsqlConfig = {
+      connectionString: process.env.DATABASE_URL,
+      host: process.env.PGSQL_HOST || 'localhost',
+      port: parseInt(process.env.PGSQL_PORT || '55432'),
+      user: process.env.PGSQL_USER || 'streamsight',
+      password: process.env.PGSQL_PASSWORD || 'streamsight',
+      database: process.env.PGSQL_DATABASE || 'streamsight',
+      ssl: parseBoolean(process.env.PGSQL_SSL),
     }
-    return new MySQLStorage(mysqlConfig)
-  } else {
-    return new FileStorage(process.env.DATA_DIR || './data')
+
+    console.log('存储模式: PostgreSQL')
+    return new PgSQLStorage(pgsqlConfig)
   }
+
+  console.log('存储模式: File')
+  return new FileStorage(process.env.DATA_DIR || './data')
 }
 
 const storage = createStorage()
