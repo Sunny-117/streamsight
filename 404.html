@@ -834,6 +834,122 @@
       text-decoration: underline;
     }
 
+    /* ===== Replay Viewer ===== */
+    .replay-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .replay-now-playing {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-secondary);
+    }
+
+    .replay-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .replay-session-card {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-md);
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .replay-session-card:hover {
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .replay-session-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .replay-session-title {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 4px;
+    }
+
+    .replay-session-id {
+      font-size: 15px;
+      font-weight: 600;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+    }
+
+    .replay-session-batches {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--accent);
+      background: rgba(0, 113, 227, 0.08);
+      padding: 2px 8px;
+      border-radius: var(--radius-pill);
+    }
+
+    .replay-session-meta {
+      font-size: 13px;
+      color: var(--text-tertiary);
+    }
+
+    .replay-play-btn {
+      flex-shrink: 0;
+      margin-left: 16px;
+    }
+
+    .replay-player-wrap {
+      background: var(--bg-tertiary);
+      border-radius: var(--radius-lg);
+      padding: 24px;
+      min-height: 200px;
+    }
+
+    .replay-player-wrap .rr-player {
+      margin: 0 auto;
+    }
+
+    .replay-loading {
+      text-align: center;
+      padding: 48px 24px;
+      font-size: 15px;
+      color: var(--text-tertiary);
+    }
+
+    .replay-empty {
+      text-align: center;
+      padding: 48px 24px;
+    }
+
+    .replay-empty-icon {
+      color: var(--text-quaternary);
+      margin-bottom: 16px;
+    }
+
+    .replay-empty-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .replay-empty-desc {
+      font-size: 14px;
+      color: var(--text-tertiary);
+      max-width: 360px;
+      margin: 0 auto;
+      line-height: 1.43;
+    }
+
     /* ===== Utilities ===== */
     .visually-hidden {
       position: absolute;
@@ -846,7 +962,8 @@
       border: 0;
     }
   </style>
-  <script type="module" crossorigin src="/streamsight/assets/index-mF7AE21H.js"></script>
+  <script type="module" crossorigin src="/streamsight/assets/index-DFS2LxsV.js"></script>
+  <link rel="stylesheet" crossorigin href="/streamsight/assets/index-D4m0shbc.css">
 </head>
 <body>
 
@@ -1089,6 +1206,18 @@
         <div id="dynamicContent"></div>
         <p id="dynamicEmpty" style="text-align: center; padding: 24px; color: var(--text-quaternary); font-size: 14px;">Click "Add Item" to create dynamic elements.</p>
       </div>
+    </div>
+  </section>
+
+  <!-- Replay Viewer -->
+  <section id="replaySection" class="section">
+    <div class="section-inner">
+      <div class="section-header">
+        <p class="section-eyebrow">Replay</p>
+        <h2 class="section-title">Watch it back.</h2>
+        <p class="section-desc">Browse recorded sessions and replay user interactions frame by frame, right in the browser.</p>
+      </div>
+      <div id="replayContainer"></div>
     </div>
   </section>
 
